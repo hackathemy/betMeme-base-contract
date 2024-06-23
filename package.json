@@ -1,0 +1,24 @@
+{
+  "name": "betmeme",
+  "version": "1.0.0",
+  "description": "A betting smart contract project",
+  "main": "index.js",
+  "scripts": {
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.js --network ropsten",
+    "createGame": "hardhat createGame --marked-price 1000 --duration 3600 --min-amount 1 --prize-amount 0.1 --network ropsten"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "ethers": "^5.4.0",
+    "hardhat": "^2.6.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2",
+    "@uniswap/v2-periphery": "^1.1.0-beta.0",
+    "dotenv": "^16.4.5"
+  }
+}
