@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract BetMeme {
     struct Game {
+        uint256 gameId;
         uint256 startTime;
         uint256 duration;
         uint256 markedPrice;
@@ -45,6 +46,7 @@ contract BetMeme {
 
         IERC20 token = IERC20(tokenAddress);
         games[gameCounter] = Game({
+            gameId:gameCounter,
             startTime: block.timestamp,
             duration: duration,
             markedPrice: markedPrice,
