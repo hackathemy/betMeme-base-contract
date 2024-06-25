@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract BetMeme {
+
     struct Game {
         uint256 gameId;
         uint256 startTime;
@@ -17,11 +18,14 @@ contract BetMeme {
         uint256 prizeAmount;
         bool isEnded;
         IERC20 token;
+        address[] betUsers;
     }
 
     struct UserBet {
+        uint256 gameId;
         bool betUp;
         uint256 amount;
+        string status;
     }
 
     uint256 public gameCounter;
@@ -46,7 +50,7 @@ contract BetMeme {
 
         IERC20 token = IERC20(tokenAddress);
         games[gameCounter] = Game({
-            gameId:gameCounter,
+            gameId: gameCounter,
             startTime: block.timestamp,
             duration: duration,
             markedPrice: markedPrice,
@@ -56,7 +60,8 @@ contract BetMeme {
             downAmount: 0,
             prizeAmount: 0,
             isEnded: false,
-            token: token
+            token: token,
+            betUsers: new address[](0)
         });
 
         emit GameCreated(gameCounter, tokenAddress);
@@ -71,8 +76,10 @@ contract BetMeme {
         require(game.token.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
 
         UserBet storage userBet = userBets[msg.sender][gameId];
+        userBet.gameId = gameId;
         userBet.betUp = betUp;
         userBet.amount += amount;
+        userBet.status = "PENDING";
 
         if (betUp) {
             game.upAmount += amount;
@@ -81,6 +88,7 @@ contract BetMeme {
         }
 
         game.prizeAmount += amount;
+        game.betUsers.push(msg.sender);
 
         emit BetPlaced(msg.sender, gameId, betUp, amount);
     }
@@ -89,16 +97,16 @@ contract BetMeme {
         Game storage game = games[gameId];
         //require(block.timestamp > game.startTime + game.duration + 60, "Game duration not yet completed");
         require(game.startTime != 0, "Game does not exist");
-        require(game.isEnded == false, "Game already ended");
+        //require(game.isEnded == false, "Game already ended");
         require(lastPrice > 0, "Invalid last price");
 
         game.lastPrice = lastPrice;
         uint256 prizePool = game.prizeAmount;
 
         if (game.lastPrice > game.markedPrice) {
-            distributeRewards(gameId, game.downAmount, prizePool, false);
-        } else {
             distributeRewards(gameId, game.upAmount, prizePool, true);
+        } else {
+            distributeRewards(gameId, game.downAmount, prizePool, false);
         }
 
         emit GameEnded(gameId, lastPrice);
@@ -106,17 +114,22 @@ contract BetMeme {
     }
 
     function distributeRewards(uint256 gameId, uint256 totalBet, uint256 prizePool, bool isBetUp) internal {
-        if (totalBet == 0) return;  // if no bets, exit early
 
         Game storage game = games[gameId];
 
-        for (uint256 i = 0; i < gameCounter; i++) {
-            UserBet storage userBet = userBets[msg.sender][i];
-            if (userBet.betUp == isBetUp && userBet.amount > 0) {
-                uint256 userReward = (userBet.amount * prizePool) / totalBet;
-                game.token.transfer(msg.sender, userReward);
-                emit Claimed(msg.sender, gameId, userReward);
+        for (uint256 i = 0; i < game.betUsers.length; i++) {
+            address user = game.betUsers[i];
+            UserBet storage userBet = userBets[user][gameId];
+            uint256 reward = 0;
+            if (userBet.betUp == isBetUp) {
+                reward = (userBet.amount * prizePool) / totalBet;
+                game.token.transfer(user, reward);
+                userBet.status = "WON";
+            } else {
+                userBet.status ="LOST";
             }
+            emit Claimed(user, gameId, reward);
+
         }
     }
 
