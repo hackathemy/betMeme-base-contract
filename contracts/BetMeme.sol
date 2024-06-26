@@ -74,8 +74,11 @@ contract BetMeme {
         //require(block.timestamp <= game.startTime + game.duration, "Betting period has ended");
         require(amount >= game.minAmount, "Bet amount too low");
         require(game.token.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
-
+        require(game.isEnded == false, "Game already ended");
         UserBet storage userBet = userBets[msg.sender][gameId];
+        require(userBets[msg.sender][gameId].amount == 0, "User already placed bet");
+
+
         userBet.gameId = gameId;
         userBet.betUp = betUp;
         userBet.amount += amount;
