@@ -3,7 +3,8 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 contract BetMeme {
 
     struct Game {
@@ -34,13 +35,17 @@ contract BetMeme {
     mapping(uint256 => Game) public games;
     mapping(address => mapping(uint256 => UserBet)) public userBets;
 
+    address public constant WETH = 0x24fe7807089e321395172633aA9c4bBa4Ac4a357; // 하드코딩된 WETH 주소
+    address public immutable factory = 0x3579357Ffc5B1b15778a004709Be5bb6B10B88b7;
+
+
     event GameCreated(uint256 gameId, address tokenAddress);
     event BetPlaced(address indexed user, uint256 gameId, bool betUp, uint256 amount);
     event GameEnded(uint256 gameId, uint256 lastPrice);
     event Claimed(address indexed user, uint256 gameId, uint256 reward);
 
+
     function createGame(
-        uint256 markedPrice,
         uint256 duration,
         uint256 minAmount,
         address tokenAddress
@@ -53,7 +58,7 @@ contract BetMeme {
             gameId: gameCounter,
             startTime: block.timestamp,
             duration: duration,
-            markedPrice: markedPrice,
+            markedPrice: getTokenPrice(tokenAddress),
             lastPrice: 0,
             minAmount: minAmount,
             upAmount: 0,
@@ -96,17 +101,16 @@ contract BetMeme {
         emit BetPlaced(msg.sender, gameId, betUp, amount);
     }
 
-    function endGame(uint256 gameId, uint256 lastPrice) external {
+    function endGame(uint256 gameId) external {
         Game storage game = games[gameId];
         //require(block.timestamp > game.startTime + game.duration + 60, "Game duration not yet completed");
         require(game.startTime != 0, "Game does not exist");
         //require(game.isEnded == false, "Game already ended");
-        require(lastPrice > 0, "Invalid last price");
-
+        uint256 lastPrice = getTokenPrice(address(game.token));
         game.lastPrice = lastPrice;
         uint256 prizePool = game.prizeAmount;
 
-        if (game.lastPrice > game.markedPrice) {
+        if (game.lastPrice >= game.markedPrice) {
             distributeRewards(gameId, game.upAmount, prizePool, true);
         } else {
             distributeRewards(gameId, game.downAmount, prizePool, false);
@@ -129,6 +133,8 @@ contract BetMeme {
                 game.token.transfer(user, reward);
                 userBet.status = "WON";
             } else {
+                reward = (userBet.amount * prizePool) / totalBet;
+                game.token.transfer(user, reward);
                 userBet.status ="LOST";
             }
             emit Claimed(user, gameId, reward);
@@ -182,6 +188,26 @@ contract BetMeme {
             userBetList[i] = userBets[msg.sender][i];
         }
         return userBetList;
+    }
+
+    function getPair(address tokenA, address tokenB) internal view returns (address pair) {
+        pair = IUniswapV2Factory(factory).getPair(tokenA, tokenB);
+        require(pair != address(0), "Pair not found");
+    }
+
+    function getReserves(address pair) public view returns (uint112 reserve0, uint112 reserve1) {
+        IUniswapV2Pair pairContract = IUniswapV2Pair(pair);
+        (reserve0, reserve1, ) = pairContract.getReserves();
+    }
+
+    function getTokenPrice(address otherToken) public view returns (uint256 priceWETH) {
+        address pairAddress = getPair(WETH, otherToken);
+        (uint112 reserveWETH, uint112 reserveOtherToken) = getReserves(pairAddress);
+
+        require(reserveWETH > 0 && reserveOtherToken > 0, "No liquidity in the pool");
+
+        // Calculate price of WETH in terms of otherToken
+        priceWETH = (uint256(reserveOtherToken) * 1e18) / uint256(reserveWETH);
     }
 
 }
