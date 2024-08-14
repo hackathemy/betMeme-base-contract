@@ -1,7 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-ethers");
 require('dotenv').config();
-require("./tasks/bet"); // 추가
+require("./tasks/bet"); // 추가 mkdir -p contracts/uniswap/v2-core
 
 
 // Replace with your actual network configuration
